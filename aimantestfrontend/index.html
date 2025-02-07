@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Plaid Login</title>
+</head>
+<body>
+  <h1>Login to Connect to Your Bank</h1>
+  <form id="loginForm">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required value="user_good"><br><br>
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required value="pass_good"><br><br>
+    <button type="submit">Login</button>
+  </form>
+  <h2>Response</h2>
+  <div id="result"></div>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async function(event) {
+      event.preventDefault();
+      
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const payload = { username, password };
+      
+      try {
+        const response = await fetch("http://localhost:8000/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        
+        const resultDiv = document.getElementById("result");
+        if (response.ok) {
+          const data = await response.json();
+          resultDiv.innerHTML = "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+        } else {
+          const errorData = await response.json();
+          resultDiv.innerHTML = "<pre>" + JSON.stringify(errorData, null, 2) + "</pre>";
+        }
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    });
+  </script>
+</body>
+</html>
