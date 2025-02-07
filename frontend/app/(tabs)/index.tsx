@@ -1,39 +1,31 @@
-import { Image, StyleSheet, Platform } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import CustomButton  from '@/src/components/Button';
-import SpendingChart from '@/src/components/Graph';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import SpendingChart from '@/src/components/Graph';
 import PieChartComponent from '@/src/components/PieChart';
+import StackedBarChart from '@/src/components/BudgetBars';
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView>
-      <SpendingChart></SpendingChart>
-      <PieChartComponent></PieChartComponent>
-      <CustomButton onPress title></CustomButton>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        <SpendingChart />
+        <PieChartComponent />
+        <StackedBarChart />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#000', // Set the SafeAreaView background to black
+  },
+  scrollViewContent: {
+    paddingBottom: 20,
     alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+    backgroundColor: '#000', // Set the ScrollView background to black
+    flexGrow: 1, // Ensures the scroll content expands properly
   },
 });
