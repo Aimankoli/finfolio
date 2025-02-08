@@ -29,3 +29,4 @@ const styles = StyleSheet.create({
     flexGrow: 1, // Ensures the scroll content expands properly
   },
 });
+
