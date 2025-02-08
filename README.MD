@@ -61,3 +61,10 @@ Refer to the `schemas/` directory for SQL schema definitions for tables such as 
    ```bash
    git clone https://github.com/aimankoli/hackrusp25.git
    cd hackrusp25
+
+Workflow:
+1. Call add transaction
+2. Call alert
+3. Call get alert
+4. Call resolve alert
+

@@ -217,8 +217,58 @@ def get_day_paid(username: str, db: Session = Depends(get_db)):
     return {"message": "Day Paid", "day_paid": user.day_paid}
 
 @app.post("/alert")
-def get_alert():
-    return {"message": "Alert"}
+def get_alert(db: Session = Depends(get_db)):
+
+    # Get most recent transaction
+    latest_transaction = db.query(Transaction).order_by(Transaction.id.desc()).first()
+    
+    if not latest_transaction:
+        return {"message": "No transactions found"}
+
+    #replace with ML model
+    if latest_transaction.amount > 100:
+        user.isalert = 1
+        db.commit()
+        
+        return {
+            "message": "Potential fraud detected",
+            "transaction_id": latest_transaction.transaction_id,
+            "merchant": latest_transaction.merchant_name,
+            "amount": latest_transaction.amount
+        }
+    
+    return {"message": "No alert"}
+
+@app.get("/alert_status")
+def alert_status(db: Session = Depends(get_db)):
+    user = db.query(User).first()
+    if not user:
+        return {"message": "User not found"}
+    
+    return {"message": "Alert status", "isalert": user.is_alert}
+    ## use for api - if user alert returns as 1, then call resolve alert
+
+    
+@app.post("/alert_resolve")
+def alert_resolve(action: str, db: Session = Depends(get_db)):
+    # Get the current user from the database
+    user = db.query(User).first()  # You may want to filter by specific user ID
+    if not user:
+        return {"message": "User not found"}
+
+    if user.is_alert == 0:
+        return {"message": "Alert already resolved"}
+    if action.lower() == "yes":
+        user.is_alert = 0
+        return {"message": "Alert resolved"}
+    elif action.lower() == "report":
+        user.alert_transaction = "Reported"
+        return {"message": "Alert reported"}
+    else:
+        return {"message": "Invalid action. Must be 'yes' or 'report'"}
+        
+    db.commit()
+    return {"message": f"Alert status updated to {user.is_alert}"}
 
 @app.get("/transactions")
 def get_transactions(db: Session = Depends(get_db)):
@@ -248,7 +298,58 @@ def get_transactions(db: Session = Depends(get_db)):
         "total_count": len(transactions_list)
     }
 
-@app.get("graph_data")
+
+import uuid
+from app.schemas.transaction import AddTransactionRequest
+@app.post("/add_transaction")
+def add_transaction(data: AddTransactionRequest, db: Session = Depends(get_db)):
+    transaction_id = str(uuid.uuid4())
+    
+    # Convert category list to string if it's a list
+    category = json.dumps(data.category) if isinstance(data.category, list) else data.category
+    
+    new_transaction = Transaction(
+        transaction_id=transaction_id,
+        account_id="9Ba75DR7nRcq4dBxBkdEfx1J1vwmGyi4xbVKr",
+        name=data.name,
+        merchant_name=data.merchant_name,
+        amount=data.amount,
+        date=data.date,
+        category=category,  # Now storing as JSON string
+        payment_channel=data.payment_channel,
+        currency=data.currency
+    )
+    db.add(new_transaction)
+    db.commit()
+    db.refresh(new_transaction)
+    return new_transaction
+    ## use for api - after calling this method call the alert method. then, call get alert to check if there is an existing alert. then call resolve alert to resolve the alert.
+
+@app.get("/graph_data")
 def get_graph_data(db: Session = Depends(get_db)):
-    pass
+    # Get first day of current month
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    
+    # Get all transactions from current month ordered by date
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day
+    ).order_by(Transaction.date.asc()).all()
+
+    if not transactions:
+        return {"message": "No transactions found"}
+
+    # Create cumulative spending dictionary
+    cumulative_spending = {}
+    running_total = 0
+    
+    for tx in transactions:
+        date_str = tx.date.strftime("%Y-%m-%d")
+        running_total += tx.amount
+        cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Graph data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
 

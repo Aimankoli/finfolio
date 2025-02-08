@@ -13,6 +13,17 @@ class TransactionBase(BaseModel):
     payment_channel: str
     currency: Optional[str] = None
 
+class AddTransactionRequest(BaseModel):
+    # transaction_id: str
+    # account_id: str
+    name: str
+    merchant_name: Optional[str] = None
+    amount: float
+    date: date
+    category: List[str]
+    payment_channel: str
+    currency: Optional[str] = None
+
 class TransactionCreate(TransactionBase):
     pass  # Used for inserting transactions
 
