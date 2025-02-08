@@ -9,12 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourhackathonproject",
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "web": {
