@@ -1,17 +1,24 @@
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import SpendingChart from '@/src/components/Graph';
-import PieChartComponent from '@/src/components/PieChart';
-import StackedBarChart from '@/src/components/BudgetBars';
+import CalendarComponent from '@/src/components/Calendar';
+import WarningComponent from '@/src/components/Warning';
 
 export default function HomeScreen() {
+  const paymentInfo = {
+    paymentName: "Car Loan Payment",
+    dueDate: "2025-02-20",
+    amount: 500,
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        <SpendingChart />
-        <PieChartComponent />
-        <StackedBarChart />
+        <CalendarComponent></CalendarComponent>
+        <WarningComponent
+          message="Warning: Your balance is too low to meet your upcoming payment!"
+          paymentInfo={paymentInfo}
+        />
       </ScrollView>
     </SafeAreaView>
   );
