@@ -13,7 +13,15 @@ const SignInScreen: React.FC = () => {
   const [showWebView, setShowWebView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Function to fetch the Plaid link token
+  const handleTestNavigation = async () => {
+    try {
+      await signIn();
+      router.replace("/");
+    } catch (error) {
+      console.error("Test navigation error:", error);
+    }
+  };
+
   const fetchLinkToken = async () => {
     try {
       setIsLoading(true);
@@ -43,7 +51,6 @@ const SignInScreen: React.FC = () => {
     }
   };
 
-  // Function to handle user sign-in
   const handleSignIn = async () => {
     if (!username || !password) {
       Alert.alert("Error", "Please enter both username and password");
@@ -76,7 +83,6 @@ const SignInScreen: React.FC = () => {
     }
   };
 
-  // Function to exchange public token
   const handlePublicTokenExchange = async (publicToken: string) => {
     try {
       setIsLoading(true);
@@ -114,7 +120,6 @@ const SignInScreen: React.FC = () => {
     }
   };
 
-  // Render WebView for Plaid Link
   if (showWebView && linkToken) {
     return (
       <View style={styles.container}>
@@ -173,7 +178,6 @@ const SignInScreen: React.FC = () => {
     );
   }
 
-  // Render login form
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome Back</Text>
@@ -203,6 +207,15 @@ const SignInScreen: React.FC = () => {
       >
         <Text style={styles.buttonText}>
           {isLoading ? "Connecting..." : "Sign In & Connect Bank"}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.testButton}
+        onPress={handleTestNavigation}
+      >
+        <Text style={styles.buttonText}>
+          Test Navigation (Skip Plaid)
         </Text>
       </TouchableOpacity>
     </View>
@@ -246,6 +259,15 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: "#9b7bce",
+  },
+  testButton: {
+    width: "85%",
+    backgroundColor: "#2e7d32",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    alignSelf: "center",
+    marginTop: 20,
   },
   buttonText: {
     color: "#ffffff",
