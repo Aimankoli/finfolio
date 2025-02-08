@@ -14,6 +14,7 @@ class ExchangePublicTokenRequest(BaseModel):
     username: str
     public_token: str
 
-# Schema for retrieving transactions
-class TransactionsRequest(BaseModel):
+class SetGoalRequest(BaseModel):
     username: str
+    amount: int
+    time_months: int

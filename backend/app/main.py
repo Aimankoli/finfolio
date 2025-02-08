@@ -1,16 +1,22 @@
 import os
 import time
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import requests
 import json
 from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import extract
 from dotenv import load_dotenv
+from collections import Counter
+from sqlalchemy import func
 
 # Import database and models
 from app.database import engine, get_db
 from app.models.user import User  
-from app.schemas.user import LoginRequest, ExchangePublicTokenRequest, TransactionsRequest
+from app.models.transaction import Transaction
+from app.schemas.user import LoginRequest, ExchangePublicTokenRequest
 
 # Load environment variables
 load_dotenv()
@@ -27,8 +33,13 @@ app.add_middleware(
 )
 
 # Create database tables if they don't exist
-from app.models.user import Base  
-Base.metadata.create_all(bind=engine)
+# from app.models.user import Base  
+# Base.metadata.create_all(bind=engine)
+
+from app.models import user, transaction
+
+user.Base.metadata.create_all(bind=engine)
+transaction.Base.metadata.create_all(bind=engine)
 
 # Plaid Credentials
 PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
@@ -101,72 +112,143 @@ def exchange_public_token(data: ExchangePublicTokenRequest, db: Session = Depend
 
     return {"message": "Bank linked successfully", "access_token": result["access_token"]}
 
-# # Step 4: Retrieve Transactions Using Stored Access Token
-# @app.post("/transactions")
-# def get_transactions(data: TransactionsRequest, db: Session = Depends(get_db)):
-#     user = db.query(User).filter(User.username == data.username).first()
-#     if not user or not user.access_token:
-#         raise HTTPException(status_code=404, detail="No access token found. Link a bank account first.")
+from app.schemas.user import SetGoalRequest
 
-#     access_token = user.access_token
+@app.post("/set_goal")
+def set_goal(data: SetGoalRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == data.username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-#     ### Step 1: Fetch Accounts to Get the Correct Account ID ###
-#     accounts_url = f"{PLAID_SANDBOX_URL}/accounts/get"
-#     accounts_payload = {
-#         "client_id": PLAID_CLIENT_ID,
-#         "secret": PLAID_SECRET,
-#         "access_token": access_token
-#     }
+    
+    user.amount = data.amount
+    user.time_months = data.time_months
+    saving_per_month = data.amount / data.time_months
+    user.saving_goal = saving_per_month
+    db.commit()
 
-#     response = requests.post(accounts_url, json=accounts_payload)
-#     accounts_response = response.json()
 
-#     if "accounts" not in accounts_response:
-#         raise HTTPException(status_code=400, detail=f"Error fetching accounts: {accounts_response}")
+    return {"message": "Goal set successfully", "saving_goal": user.saving_goal}
 
-#     # Extract the first valid account_id dynamically
-#     account_id = accounts_response["accounts"][0]["account_id"]
+@app.post("/top_spenders")
+def get_top_spender(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-#     ### Step 2: Fire Webhook to Simulate Transactions Data Ready ###
-#     webhook_url = f"{PLAID_SANDBOX_URL}/sandbox/item/fire_webhook"
-#     webhook_payload = {
-#         "client_id": PLAID_CLIENT_ID,
-#         "secret": PLAID_SECRET,
-#         "access_token": access_token,
-#         "webhook_code": "DEFAULT_UPDATE"
-#     }
+    # Get all transactions with categories
+    transactions = db.query(Transaction).filter(
+        Transaction.category.isnot(None)
+    ).all()
 
-#     response = requests.post(webhook_url, json=webhook_payload)
-#     webhook_response = response.json()
+    if not transactions:
+        return {"message": "No transactions found"}
 
-#     ### Step 3: Retry Fetching Transactions Until Data is Available ###
-#     max_retries = 5
-#     retry_wait = 5  # Wait time in seconds
+    # Flatten categories and count them
+    all_categories = []
+    for transaction in transactions:
+        # Handle string representation of list
+        if isinstance(transaction.category, str):
+            # Remove brackets and quotes, split by comma
+            categories = transaction.category.strip('[]').replace('"', '').split(',')
+            # Clean up whitespace
+            categories = [cat.strip() for cat in categories]
+            all_categories.extend(categories)
+        elif isinstance(transaction.category, list):
+            all_categories.extend(transaction.category)
 
-#     for attempt in range(max_retries):
-#         print(f"🔄 Attempt {attempt + 1}: Fetching transactions...")
+    # Count categories
+    category_counts = Counter(all_categories)
+    
+    # Get top 2 most common categories
+    top_categories = category_counts.most_common(2)
+    
+    if len(top_categories) < 2:
+        return {"message": "Not enough categories found"}
 
-#         transactions_url = f"{PLAID_SANDBOX_URL}/transactions/get"
-#         transactions_payload = {
-#             "client_id": PLAID_CLIENT_ID,
-#             "secret": PLAID_SECRET,
-#             "access_token": access_token,
-#             "start_date": "2025-02-01",
-#             "end_date": "2025-02-05",
-#             "options": {
-#                 "account_ids": [account_id]
-#             }
-#         }
+    # Update user's top spender fields
+    user.top_spender = top_categories[0][0]  # First most common category
+    user.top2_spender = top_categories[1][0]  # Second most common category
+    db.commit()
 
-#         response = requests.post(transactions_url, json=transactions_payload)
-#         transactions_response = response.json()
+    return {
+        "message": "Top spenders updated",
+        "top_spender": user.top_spender,
+        "top2_spender": user.top2_spender,
+        "top_spender_count": top_categories[0][1],
+        "top2_spender_count": top_categories[1][1]
+    }
 
-#         if "transactions" in transactions_response and transactions_response["transactions"]:
-#             print("✅ Transactions found!")
-#             return {"transactions": transactions_response["transactions"]}
+@app.post("/day_paid")
+def get_day_paid(username: str, db: Session = Depends(get_db)):
 
-#         print("⌛ Waiting for transactions to populate...")
-#         time.sleep(retry_wait)
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-#     # If transactions are still empty after retries
-#     raise HTTPException(status_code=400, detail="Error fetching transactions after multiple retries.")
+    #get current time
+    now = datetime.now()
+    prev_month = now - relativedelta(months=1)
+    current_year = prev_month.year
+    current_month = prev_month.month
+
+    #debug
+    all_transactions = db.query(Transaction).filter(
+        Transaction.amount<0
+    ).all()
+    print(f"Found {len(all_transactions)} total negative transactions")
+
+    #query
+    incoming_transaction = db.query(Transaction).filter(
+        Transaction.amount<0,
+        extract('year', Transaction.date) == current_year,
+        extract('month', Transaction.date) == current_month
+    ).order_by(Transaction.date).first()
+
+    if not incoming_transaction:
+        return {"message": "No transaction found"}
+    
+    day = incoming_transaction.date.day
+
+    user.day_paid = day
+
+    db.commit()
+
+    return {"message": "Day Paid", "day_paid": user.day_paid}
+
+@app.post("/alert")
+def get_alert():
+    return {"message": "Alert"}
+
+@app.get("/transactions")
+def get_transactions(db: Session = Depends(get_db)):
+    # Calculate date 30 days ago
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    
+    # Query transactions
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= thirty_days_ago
+    ).order_by(Transaction.date.desc()).all()
+    
+    if not transactions:
+        return {"message": "No transactions found"}
+    
+    # Format transactions for response
+    transactions_list = []
+    for tx in transactions:
+        transactions_list.append({
+            "date": tx.date.strftime("%Y-%m-%d"),
+            "amount": tx.amount,
+            "category": tx.category,
+        })
+    
+    return {
+        "message": "Transactions retrieved successfully",
+        "transactions": transactions_list,
+        "total_count": len(transactions_list)
+    }
+
+@app.get("graph_data")
+def get_graph_data(db: Session = Depends(get_db)):
+    pass
+
