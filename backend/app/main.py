@@ -325,6 +325,15 @@ def add_transaction(data: AddTransactionRequest, db: Session = Depends(get_db)):
     return new_transaction
     ## use for api - after calling this method call the alert method. then, call get alert to check if there is an existing alert. then call resolve alert to resolve the alert.
 
+@app.delete("/delete_transaction")
+def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
+    transaction = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not transaction:
+        return {"message": "Transaction not found"}
+    db.delete(transaction)
+    db.commit()
+    return {"message": "Transaction deleted successfully"}
+
 @app.get("/graph_data")
 def get_graph_data(db: Session = Depends(get_db)):
     # Get first day of current month
@@ -350,6 +359,117 @@ def get_graph_data(db: Session = Depends(get_db)):
 
     return {
         "message": "Graph data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
+
+@app.get("/graph_data_food")
+def get_graph_data_food(db: Session = Depends(get_db)):
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day
+    ).order_by(Transaction.date.asc()).all()
+
+    if not transactions:
+        return {"message": "No transactions found"}
+
+    cumulative_spending = {}
+    running_total = 0
+    
+    for tx in transactions:
+        # Handle both string and list formats of category
+        categories = []
+        if isinstance(tx.category, str):
+            try:
+                categories = json.loads(tx.category)
+            except json.JSONDecodeError:
+                categories = [tx.category]
+        elif isinstance(tx.category, list):
+            categories = tx.category
+
+        # Check if "Food and Drink" is in the categories
+        if any(cat.strip() == "Food and Drink" for cat in categories):
+            date_str = tx.date.strftime("%Y-%m-%d")
+            running_total += tx.amount
+            cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Food and Drink spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
+
+@app.get("/graph_data_travel")
+def get_graph_data_travel(db: Session = Depends(get_db)):
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day
+    ).order_by(Transaction.date.asc()).all()
+
+    if not transactions:
+        return {"message": "No transactions found"}
+
+    cumulative_spending = {}
+    running_total = 0
+    
+    for tx in transactions:
+        # Handle both string and list formats of category
+        categories = []
+        if isinstance(tx.category, str):
+            try:
+                categories = json.loads(tx.category)
+            except json.JSONDecodeError:
+                categories = [tx.category]
+        elif isinstance(tx.category, list):
+            categories = tx.category
+
+        # Check if "Travel" is in the categories
+        if any(cat.strip() == "Travel" for cat in categories):
+            date_str = tx.date.strftime("%Y-%m-%d")
+            running_total += tx.amount
+            cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Travel spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
+
+@app.get("/graph_data_entertainment")
+def get_graph_data_entertainment(db: Session = Depends(get_db)):
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day
+    ).order_by(Transaction.date.asc()).all()
+
+    if not transactions:
+        return {"message": "No transactions found"}
+
+    cumulative_spending = {}
+    running_total = 0
+    
+    for tx in transactions:
+        # Handle both string and list formats of category
+        categories = []
+        if isinstance(tx.category, str):
+            try:
+                categories = json.loads(tx.category)
+            except json.JSONDecodeError:
+                categories = [tx.category]
+        elif isinstance(tx.category, list):
+            categories = tx.category
+
+        # Check if "Entertainment" is in the categories
+        if any(cat.strip() == "Entertainment" for cat in categories):
+            date_str = tx.date.strftime("%Y-%m-%d")
+            running_total += tx.amount
+            cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Entertainment spending data retrieved successfully",
         "cumulative_spending": cumulative_spending
     }
 
