@@ -1,223 +1,177 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from "react-native";
-import { WebView } from "react-native-webview";
-import { useAuth } from "../src/context/AuthContext";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Button, ActivityIndicator, Alert, StyleSheet, Text } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
+import { useAuth } from "../src/context/AuthContext";
+
+const LOGIN_URL = "http://localhost:8000/login";
+const CREATE_LINK_TOKEN_URL = "http://localhost:8000/create_link_token";
+const EXCHANGE_PUBLIC_TOKEN_URL = "http://localhost:8000/exchange_public_token";
 
 const SignInScreen: React.FC = () => {
-  const { signIn } = useAuth();
   const router = useRouter();
+  const { signIn, isLoading: authLoading } = useAuth();
   const [username, setUsername] = useState("user_good");
   const [password, setPassword] = useState("pass_good");
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [showWebView, setShowWebView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const fallbackTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handleTestNavigation = async () => {
+  useEffect(() => {
+    const subscription = Linking.addEventListener("url", handleDeepLink);
+    return () => {
+      subscription.remove();
+      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+    };
+  }, []);
+
+  const handleDeepLink = async (event: { url: string }) => {
+    console.log("Deep link received:", event.url);
     try {
-      await signIn();
-      router.replace("/");
-    } catch (error) {
-      console.error("Test navigation error:", error);
-    }
-  };
+      const urlObj = new URL(event.url);
+      const publicToken = urlObj.searchParams.get("public_token");
 
-  const fetchLinkToken = async () => {
-    try {
-      setIsLoading(true);
-      console.log("Fetching link token...");
-      const response = await fetch("http://localhost:8000/create_link_token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const data = await response.json();
-      console.log("Link token response:", data);
-
-      if (data.link_token) {
-        setLinkToken(data.link_token);
-        setShowWebView(true);
+      if (publicToken) {
+        console.log("Public token received:", publicToken);
+        if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+        await WebBrowser.dismissBrowser();
+        await handlePublicTokenExchange(publicToken);
       } else {
-        throw new Error(data.detail || "Failed to get link token");
+        console.log("No public token found in deep link");
+        await WebBrowser.dismissBrowser();
       }
     } catch (error) {
-      console.error("Link token error:", error);
-      Alert.alert(
-        "Connection Error",
-        "Unable to connect to bank services. Please try again."
-      );
-    } finally {
-      setIsLoading(false);
+      console.error("Error parsing deep link:", error);
+      await WebBrowser.dismissBrowser();
     }
   };
 
-  const handleSignIn = async () => {
-    if (!username || !password) {
-      Alert.alert("Error", "Please enter both username and password");
-      return;
-    }
-
+  const handleLogin = async () => {
     try {
       setIsLoading(true);
-      console.log("Attempting sign in...");
-      
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch(LOGIN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        console.log("Login successful, fetching Plaid token...");
+        console.log("Login successful. Fetching link token...");
         await fetchLinkToken();
       } else {
-        Alert.alert("Login Failed", data.detail || "Invalid credentials");
+        Alert.alert("Login Failed", "Invalid credentials");
       }
     } catch (error) {
-      console.error("Sign in error:", error);
-      Alert.alert("Error", "Connection failed. Please check your internet connection.");
+      console.error("Login error:", error);
+      Alert.alert("Error", "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchLinkToken = async () => {
+    try {
+      const response = await fetch(CREATE_LINK_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+
+      if (data.link_token) {
+        await openPlaidLink(data.link_token);
+      } else {
+        throw new Error("Link token not received");
+      }
+    } catch (error) {
+      console.error("Error fetching link token:", error);
+      Alert.alert("Error", "Unable to get link token.");
+    }
+  };
+
+  const openPlaidLink = async (token: string) => {
+    try {
+      console.log("🚀 Starting Plaid Link flow...");
+      const redirectUrl = Linking.createURL("plaid");
+      const authUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${token}&redirect_uri=${encodeURIComponent(
+        redirectUrl
+      )}`;
+      console.log("📍 Opening URL:", authUrl);
+
+      fallbackTimer.current = setTimeout(async () => {
+        console.log("⚠️ Fallback timeout reached");
+        await WebBrowser.dismissBrowser();
+      }, 10000);
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+      console.log("📱 Plaid WebBrowser result:", result);
+      
+      if (result.type === 'cancel') {
+        console.log("❌ User cancelled Plaid flow");
+        try {
+          console.log("🔑 Attempting to sign in...");
+          await signIn();
+          console.log("✅ Sign in successful");
+          console.log("🔄 Redirecting to explore page...");
+          router.replace("/(tabs)/explore");
+        } catch (error) {
+          console.error("🚨 Error during sign in:", error);
+        }
+        return;
+      }
+
+    } catch (error) {
+      console.error("🚨 Error in Plaid flow:", error);
+      Alert.alert("Error", "An issue occurred with Plaid Link.");
+    } finally {
+      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
     }
   };
 
   const handlePublicTokenExchange = async (publicToken: string) => {
     try {
       setIsLoading(true);
-      console.log("Exchanging public token:", publicToken);
-      
-      const response = await fetch("http://localhost:8000/exchange_public_token", {
+      const response = await fetch(EXCHANGE_PUBLIC_TOKEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          username, 
-          public_token: publicToken 
-        }),
+        body: JSON.stringify({ username, public_token: publicToken }),
       });
+      const data = await response.json();
 
-      const result = await response.json();
-      console.log("Token exchange result:", result);
-
-      if (response.ok && result.access_token) {
-        setShowWebView(false);
+      if (response.ok && data.access_token) {
+        console.log("Access token exchange successful");
         await signIn();
-        console.log("Authentication successful, redirecting...");
-        router.replace("/");
+        console.log("Sign in successful, navigating to tabs...");
+        router.replace("/(tabs)");
       } else {
-        throw new Error(result.detail || "Failed to exchange token");
+        throw new Error("Access token exchange failed");
       }
     } catch (error) {
-      console.error("Token exchange error:", error);
-      Alert.alert(
-        "Connection Error",
-        "Failed to link your bank account. Please try again."
-      );
-      setShowWebView(false);
+      console.error("Error exchanging public token:", error);
+      Alert.alert("Error", "Failed to link bank account.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (showWebView && linkToken) {
-    return (
-      <View style={styles.container}>
-        <WebView
-          source={{
-            uri: `https://cdn.plaid.com/link/v2/stable/link.html?token=${linkToken}`,
-            headers: {
-              'Plaid-Link-Version': '2.0.781'
-            }
-          }}
-          onMessage={(event) => {
-            try {
-              const data = JSON.parse(event.nativeEvent.data);
-              console.log("Plaid message received:", data);
-
-              switch (data.eventName) {
-                case 'SUCCESS':
-                  if (data.metadata && data.metadata.public_token) {
-                    console.log("Successfully obtained public token");
-                    handlePublicTokenExchange(data.metadata.public_token);
-                  }
-                  break;
-                  
-                case 'EXIT':
-                  console.log("User exited Plaid Link");
-                  setShowWebView(false);
-                  break;
-
-                case 'LOAD':
-                  console.log("Plaid Link loaded");
-                  break;
-
-                default:
-                  console.log("Other Plaid event:", data.eventName);
-              }
-            } catch (error) {
-              console.error("Error processing Plaid message:", error);
-            }
-          }}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.warn('WebView error: ', nativeEvent);
-            Alert.alert(
-              "Error",
-              "There was a problem loading the bank connection interface."
-            );
-            setShowWebView(false);
-          }}
-          onHttpError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.warn('WebView HTTP error: ', nativeEvent.statusCode);
-          }}
-          style={styles.webview}
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome Back</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={username}
-        onChangeText={setUsername}
-        placeholderTextColor="#666"
-        editable={!isLoading}
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        placeholderTextColor="#666"
-        editable={!isLoading}
-        autoCapitalize="none"
-      />
-      <TouchableOpacity 
-        style={[styles.button, isLoading && styles.buttonDisabled]}
-        onPress={handleSignIn}
-        disabled={isLoading}
-      >
-        <Text style={styles.buttonText}>
-          {isLoading ? "Connecting..." : "Sign In & Connect Bank"}
-        </Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Welcome</Text>
+      
+      <View style={styles.buttonContainer}>
+        <Button 
+          title="Sign In with Plaid" 
+          onPress={handleLogin} 
+          disabled={isLoading || authLoading} 
+        />
+        
+        <Button 
+          title="Register New Account" 
+          onPress={() => router.push("/register")} 
+          disabled={isLoading || authLoading} 
+        />
+      </View>
 
-      <TouchableOpacity 
-        style={styles.testButton}
-        onPress={handleTestNavigation}
-      >
-        <Text style={styles.buttonText}>
-          Test Navigation (Skip Plaid)
-        </Text>
-      </TouchableOpacity>
+      {(isLoading || authLoading) && <ActivityIndicator style={{ marginTop: 20 }} />}
     </View>
   );
 };
@@ -225,55 +179,19 @@ const SignInScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1e1e1e",
-  },
-  webview: {
-    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 30,
-    textAlign: "center",
-    marginTop: 100,
+    fontSize: 24,
+    marginBottom: 20,
   },
-  input: {
-    width: "85%",
-    height: 50,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    alignSelf: "center",
-  },
-  button: {
-    width: "85%",
-    backgroundColor: "#6200ee",
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    alignSelf: "center",
-    marginTop: 10,
-  },
-  buttonDisabled: {
-    backgroundColor: "#9b7bce",
-  },
-  testButton: {
-    width: "85%",
-    backgroundColor: "#2e7d32",
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    alignSelf: "center",
-    marginTop: 20,
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
+  buttonContainer: {
+    gap: 15,
+    width: "100%",
+    maxWidth: 300,
+  }
 });
 
 export default SignInScreen;

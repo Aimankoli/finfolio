@@ -8,14 +8,22 @@ export default function TabLayout() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    console.log("📱 TabLayout: Component mounted");
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    console.log("isAuthenticated:", isAuthenticated);
+    console.log("🔄 TabLayout: State changed:", {
+      isMounted,
+      isAuthenticated,
+      currentTime: new Date().toISOString()
+    });
+    
     if (isMounted && !isAuthenticated) {
-      console.log("Redirecting to /signin...");
+      console.log("⚠️ TabLayout: No authentication, redirecting to signin");
       router.replace("/signin");
+    } else if (isMounted && isAuthenticated) {
+      console.log("✅ TabLayout: User is authenticated");
     }
   }, [isMounted, isAuthenticated]);
   
