@@ -8,6 +8,7 @@ import { API_URL } from '@/src/config';
 import TransactionList from '@/src/components/TransactionList';
 import TopTwoSpenders from '@/src/components/TopTwoSpenders';
 import SubscriptionsList from '@/src/components/Subscriptions';
+import ToolTip from '@/src/components/ToolTip';
 
 export default function HomeScreen() {
   const [spendingData, setSpendingData] = useState<{
@@ -167,6 +168,9 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.tooltipContainer}>
+        <ToolTip message="Calendar Tip: Set automatic savings reminders!" />
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.buttonContainer}>
         {categories.map((category) => (
           <Text
@@ -236,5 +240,11 @@ const styles = StyleSheet.create({
   selectedButton: {
     backgroundColor: '#333',
     borderColor: '#fff',
+  },
+  tooltipContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    zIndex: 1000,
   },
 });
