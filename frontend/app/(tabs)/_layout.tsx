@@ -1,6 +1,7 @@
 import { Tabs, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../src/context/AuthContext";
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const { isAuthenticated } = useAuth();
@@ -25,12 +26,51 @@ export default function TabLayout() {
   }
 
   return (
-    <Tabs>
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="explore" options={{ title: "Explore" }} />
-      <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
-      <Tabs.Screen name="goals" options={{ title: "Goals" }} />
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#007AFF', // Active icon color
+        tabBarInactiveTintColor: '#8E8E93', // Inactive icon color
+        tabBarStyle: {
+          backgroundColor: '#1C1C1E', // Dark background for the tab bar
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: "Calendar",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="goals"
+        options={{
+          title: "Goals",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

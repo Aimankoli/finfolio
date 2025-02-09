@@ -108,7 +108,7 @@ const SignInScreen: React.FC = () => {
         console.log("❌ User cancelled Plaid flow");
         try {
           await signIn(username);
-          router.replace("/(tabs)/explore");
+          router.replace("/(tabs)");
         } catch (error) {
           console.error("🚨 Error during sign in:", error);
         }
@@ -134,7 +134,7 @@ const SignInScreen: React.FC = () => {
       if (response.ok && data.access_token) {
         console.log("Access token exchange successful");
         await signIn(username);
-        router.replace("/(tabs)/explore");
+        router.replace("/(tabs)");
       } else {
         throw new Error("Access token exchange failed");
       }
@@ -177,13 +177,13 @@ const SignInScreen: React.FC = () => {
           style={styles.button}
           onPress={handleLogin}
         >
-          Sign In with Plaid
+          Register With Plaid
         </Text>
         <Text 
           style={styles.registerButton}
           onPress={() => router.push("/register")}
         >
-          Register New Account
+          Already have an account? Sign In
         </Text>
       </View>
       {(isLoading || authLoading) && <ActivityIndicator color="#007AFF" style={{ marginTop: 20 }} />}

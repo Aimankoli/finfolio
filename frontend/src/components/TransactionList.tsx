@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 interface Transaction {
   date: string;
   amount: number;
-  category: string[];
+  merchant_name: string;
 }
 
 interface TransactionListProps {
@@ -23,7 +23,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
           <View key={`${item.date}-${index}`} style={styles.transactionItem}>
             <View style={styles.leftContent}>
               <Text style={styles.date}>{new Date(item.date).toLocaleDateString()}</Text>
-              <Text style={styles.category}>{Array.isArray(item.category) ? item.category[0] : item.category}</Text>
+              <Text style={styles.category}>{item.merchant_name}</Text>
             </View>
             <Text style={[
               styles.amount,

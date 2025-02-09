@@ -43,7 +43,7 @@ const Graph: React.FC<GraphProps> = ({ data, title, color, category, predictedVa
       // Prediction line (origin to day 28)
       {
         data: [0, ...Array(Object.keys(data).length).fill(null), prediction],
-        color: () => '#000000',
+        color: () => '#FFFFFF',
         strokeWidth: 1,
         withDots: false,  // Remove dots
         strokeDashArray: [5, 5]  // Make line dotted
@@ -60,22 +60,11 @@ const Graph: React.FC<GraphProps> = ({ data, title, color, category, predictedVa
           width={chartWidth}
           height={220}
           chartConfig={{
-            backgroundColor: '#ffffff',
-            backgroundGradientFrom: '#ffffff',
-            backgroundGradientTo: '#ffffff',
-            decimalPlaces: 2,
-            color: (opacity = 1) => color,
-            propsForDots: {
-              r: "4",
-            },
-            propsForBackgroundLines: {
-              strokeDasharray: "", 
-            },
-            propsForLabels: {
-              fontSize: 10,
-            },
-            fillShadowGradient: 'transparent',  // Ensure shading is removed
-            fillShadowGradientOpacity: 0  // Ensure shading is removed
+            backgroundGradientFrom: "#1e2923",
+            backgroundGradientTo: "#08130d",
+            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+            strokeWidth: 2,
           }}
           bezier={false}  // Straight lines
           style={styles.chart}

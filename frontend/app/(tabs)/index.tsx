@@ -63,6 +63,10 @@ export default function HomeScreen() {
         entertainmentRes.json()
       ]);
 
+      // Add debug logging
+      console.log('All spending data:', allData);
+      console.log('Food spending data:', foodData);
+
       // Update transactions
       setTransactions(transactionsData.transactions || []);
 
@@ -73,6 +77,9 @@ export default function HomeScreen() {
         travel: travelData.cumulative_spending || {},
         entertainment: entertainmentData.cumulative_spending || {}
       });
+
+      // Add debug logging for final state
+      console.log('Updated spending data state:', spendingData);
 
       console.log('Data updated:', { transactions: transactionsData, graphs: allData });
     } catch (error) {
@@ -223,26 +230,9 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.tooltipContainer}>
-        <ToolTip message="Calendar Tip: Set automatic savings reminders!" />
+        <ToolTip message="Track and manage your spending effortlessly with this dashboard! View total spending trends, top spending categories, and budget progress. Keep an eye on upcoming subscriptions and recent transactions to stay financially organized. 🚀💰" />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.buttonContainer}>
-        {categories.map((category) => (
-          <Text
-            key={category.id}
-            style={[
-              styles.button,
-              selectedCategory === category.id && styles.selectedButton
-            ]}
-            onPress={() => setSelectedCategory(category.id)}
-          >
-            {category.id.charAt(0).toUpperCase() + category.id.slice(1)}
-          </Text>
-        ))}
-      </ScrollView>
-      
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        <Text style={styles.totalSpendingTitle}>Total Spending</Text>
-        
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false} 
@@ -272,14 +262,16 @@ export default function HomeScreen() {
 
         {categories.map((category) => (
           selectedCategory === category.id && (
-            <SpendingGraph
-              key={category.id}
-              data={spendingData[category.id as keyof typeof spendingData] ?? {}}
-              predictedValue={predictedValues[category.id as keyof typeof predictedValues] ?? 0}
-              category={category.id as 'all' | 'food' | 'entertainment' | 'travel'}
-              title={category.title}
-              color={category.color}
-            />
+            <View key={category.id}>
+              <SpendingGraph
+                key={category.id}
+                data={spendingData[category.id as keyof typeof spendingData] ?? {}}
+                predictedValue={predictedValues[category.id as keyof typeof predictedValues] ?? 0}
+                category={category.id as 'all' | 'food' | 'entertainment' | 'travel'}
+                title={category.title}
+                color={category.color}
+              />
+            </View>
           )
         ))}
         <TopTwoSpenders

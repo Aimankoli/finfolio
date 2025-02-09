@@ -16,7 +16,7 @@ const RegisterScreen: React.FC = () => {
       setIsLoading(true);
       try {
         await signIn();
-        router.replace("/(tabs)/explore");
+        router.replace("/(tabs)");
       } catch (error) {
         console.error("Registration error:", error);
       } finally {
