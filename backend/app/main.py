@@ -857,14 +857,23 @@ def get_travel_model(username: str, db: Session = Depends(get_db)):
 
 @app.get("/get_food_predicted")
 def set_food_predicted(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
     return user.food_spending_predicted
 
 @app.get("/get_entertainment_predicted")
 def set_entertainment_predicted(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
     return user.entertainment_spending_predicted
 
 @app.get("/get_travel_predicted")
 def set_travel_predicted(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
     return user.travel_spending_predicted   
 
 @app.post("/post_actual_food")
