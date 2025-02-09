@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Button, ActivityIndicator, Alert, StyleSheet, Text, TextInput } from "react-native";
+import { View, Text, ActivityIndicator, Alert, StyleSheet, TextInput, Image } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
@@ -57,7 +57,7 @@ const SignInScreen: React.FC = () => {
 
       if (response.ok) {
         console.log("Login successful. Fetching link token...");
-        setUsername(username); // Set username in context
+        setUsername(username);
         await fetchLinkToken();
       } else {
         Alert.alert("Login Failed", "Invalid credentials");
@@ -91,12 +91,10 @@ const SignInScreen: React.FC = () => {
 
   const openPlaidLink = async (token: string) => {
     try {
-      console.log("🚀 Starting Plaid Link flow...");
       const redirectUrl = Linking.createURL("plaid");
       const authUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${token}&redirect_uri=${encodeURIComponent(
         redirectUrl
       )}`;
-      console.log("📍 Opening URL:", authUrl);
 
       fallbackTimer.current = setTimeout(async () => {
         console.log("⚠️ Fallback timeout reached");
@@ -109,10 +107,7 @@ const SignInScreen: React.FC = () => {
       if (result.type === "cancel") {
         console.log("❌ User cancelled Plaid flow");
         try {
-          console.log("🔑 Attempting to sign in...");
           await signIn(username);
-          console.log("✅ Sign in successful");
-          console.log("🔄 Redirecting to explore page...");
           router.replace("/(tabs)/explore");
         } catch (error) {
           console.error("🚨 Error during sign in:", error);
@@ -139,7 +134,6 @@ const SignInScreen: React.FC = () => {
       if (response.ok && data.access_token) {
         console.log("Access token exchange successful");
         await signIn(username);
-        console.log("Sign in successful, navigating to tabs...");
         router.replace("/(tabs)/explore");
       } else {
         throw new Error("Access token exchange failed");
@@ -154,10 +148,18 @@ const SignInScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome</Text>
+      <View style={styles.logoContainer}>
+        <Image 
+          source={require('../assets/logo.png')} 
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>Welcome</Text>
+      </View>
       <TextInput
         style={styles.input}
         placeholder="Username"
+        placeholderTextColor="#8E8E93"
         value={username}
         onChangeText={setLocalUsername}
         autoCapitalize="none"
@@ -165,23 +167,26 @@ const SignInScreen: React.FC = () => {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor="#8E8E93"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
       <View style={styles.buttonContainer}>
-        <Button
-          title="Sign In with Plaid"
+        <Text 
+          style={styles.button}
           onPress={handleLogin}
-          disabled={isLoading || authLoading}
-        />
-        <Button
-          title="Register New Account"
+        >
+          Sign In with Plaid
+        </Text>
+        <Text 
+          style={styles.registerButton}
           onPress={() => router.push("/register")}
-          disabled={isLoading || authLoading}
-        />
+        >
+          Register New Account
+        </Text>
       </View>
-      {(isLoading || authLoading) && <ActivityIndicator style={{ marginTop: 20 }} />}
+      {(isLoading || authLoading) && <ActivityIndicator color="#007AFF" style={{ marginTop: 20 }} />}
     </View>
   );
 };
@@ -192,26 +197,62 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#000000",
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 24,
-    marginBottom: 20,
+    fontSize: 34,
+    fontWeight: '600',
+    color: "#FFFFFF",
   },
   input: {
     width: "100%",
     maxWidth: 300,
-    height: 40,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    height: 50,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    color: '#FFFFFF',
+    fontSize: 16,
   },
   buttonContainer: {
-    gap: 15,
+    gap: 16,
     width: "100%",
     maxWidth: 300,
+    marginTop: 16,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    width: '100%',
+    textAlign: 'center',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    overflow: 'hidden',
+  },
+  registerButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    width: '100%',
+    textAlign: 'center',
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+    overflow: 'hidden',
   },
 });
 

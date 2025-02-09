@@ -3,11 +3,11 @@ import { View, Text, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 
 // Define the props type explicitly
-interface SpendingChartProps {
+type SpendingChartProps = {
   data: Record<string, number>;
   title: string;
   color: string;
-}
+};
 
 const SpendingChart: React.FC<SpendingChartProps> = ({ data, title, color }) => {
   // Ensure we have valid data
