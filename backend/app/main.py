@@ -241,34 +241,32 @@ def get_alert(db: Session = Depends(get_db)):
 
 @app.get("/alert_status")
 def alert_status(db: Session = Depends(get_db)):
-    user = db.query(User).first()
+    user = db.query(User).first()  # Get the first user for now
     if not user:
-        return {"message": "User not found"}
+        return {"message": "User not found", "isalert": 0}
     
     return {"message": "Alert status", "isalert": user.is_alert}
     ## use for api - if user alert returns as 1, then call resolve alert
 
     
 @app.post("/alert_resolve")
-def alert_resolve(action: str, db: Session = Depends(get_db)):
-    # Get the current user from the database
-    user = db.query(User).first()  # You may want to filter by specific user ID
-    if not user:
-        return {"message": "User not found"}
-
-    if user.is_alert == 0:
-        return {"message": "Alert already resolved"}
-    if action.lower() == "yes":
-        user.is_alert = 0
-        return {"message": "Alert resolved"}
-    elif action.lower() == "report":
-        user.alert_transaction = "Reported"
-        return {"message": "Alert reported"}
-    else:
-        return {"message": "Invalid action. Must be 'yes' or 'report'"}
+def resolve_alert(action: dict, db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
         
-    db.commit()
-    return {"message": f"Alert status updated to {user.is_alert}"}
+        # Reset the alert status
+        user.is_alert = 0
+        db.commit()
+        
+        return {
+            "message": "Alert resolved successfully",
+            "action": action["action"],
+            "status": "verified" if action["action"] == "yes" else "reported"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/transactions")
 def get_transactions(db: Session = Depends(get_db)):
@@ -315,13 +313,21 @@ def add_transaction(data: AddTransactionRequest, db: Session = Depends(get_db)):
         merchant_name=data.merchant_name,
         amount=data.amount,
         date=data.date,
-        category=category,  # Now storing as JSON string
+        category=category,
         payment_channel=data.payment_channel,
         currency=data.currency
     )
     db.add(new_transaction)
     db.commit()
     db.refresh(new_transaction)
+
+    # Check for high value transaction and set alert
+    if data.amount > 100:
+        user = db.query(User).first()  # Get the first user for now
+        if user:
+            user.is_alert = 1
+            db.commit()
+
     return new_transaction
     ## use for api - after calling this method call the alert method. then, call get alert to check if there is an existing alert. then call resolve alert to resolve the alert.
 
