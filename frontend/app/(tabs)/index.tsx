@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View, Text, Alert } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
@@ -8,6 +8,8 @@ import { API_URL } from '@/src/config';
 import TransactionList from '@/src/components/TransactionList';
 import TopTwoSpenders from '@/src/components/TopTwoSpenders';
 import SubscriptionsList from '@/src/components/Subscriptions';
+import SpendingGraph from '@/src/components/Graph';
+import SpendingProgress from '@/src/components/SpendingProgress';
 import ToolTip from '@/src/components/ToolTip';
 
 export default function HomeScreen() {
@@ -33,6 +35,50 @@ export default function HomeScreen() {
   });
 
   const [isAlert, setIsAlert] = useState(false);
+  const [shouldRefetch, setShouldRefetch] = useState(false);
+
+  const [predictedValues, setPredictedValues] = useState({
+    food: 0,
+    entertainment: 0,
+    travel: 0
+  });
+
+  const fetchAllData = async () => {
+    try {
+      // Fetch all data in parallel
+      const [transactionsRes, allRes, foodRes, travelRes, entertainmentRes] = await Promise.all([
+        fetch(`${API_URL}/transactions`),
+        fetch(`${API_URL}/graph_data`),
+        fetch(`${API_URL}/graph_data_food`),
+        fetch(`${API_URL}/graph_data_travel`),
+        fetch(`${API_URL}/graph_data_entertainment`)
+      ]);
+
+      // Process all responses in parallel
+      const [transactionsData, allData, foodData, travelData, entertainmentData] = await Promise.all([
+        transactionsRes.json(),
+        allRes.json(),
+        foodRes.json(),
+        travelRes.json(),
+        entertainmentRes.json()
+      ]);
+
+      // Update transactions
+      setTransactions(transactionsData.transactions || []);
+
+      // Update spending data with cumulative_spending
+      setSpendingData({
+        all: allData.cumulative_spending || {},
+        food: foodData.cumulative_spending || {},
+        travel: travelData.cumulative_spending || {},
+        entertainment: entertainmentData.cumulative_spending || {}
+      });
+
+      console.log('Data updated:', { transactions: transactionsData, graphs: allData });
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
 
   const checkAlertStatus = async () => {
     try {
@@ -74,28 +120,41 @@ export default function HomeScreen() {
         body: JSON.stringify({ action })
       });
       
-      const data = await response.json();
-      console.log('Alert Resolve Response:', data);
-      
-      // Reset alert state only after successful resolution
       if (response.ok) {
         setIsAlert(false);
+        setShouldRefetch(true); // Trigger refetch
         
-        // Show confirmation message
         Alert.alert(
           action === "yes" ? "Transaction Verified" : "Fraud Reported",
           action === "yes" 
             ? "Thank you for verifying this transaction." 
             : "This transaction has been reported as fraudulent.",
-          [{ text: "OK" }]
+          [{ 
+            text: "OK",
+            onPress: async () => {
+              await fetchAllData(); // Immediate fetch
+              setShouldRefetch(false);
+            }
+          }]
         );
       }
-      
     } catch (error) {
       console.error('Error resolving alert:', error);
       Alert.alert("Error", "Failed to process your response. Please try again.");
     }
   };
+
+  useEffect(() => {
+    fetchAllData(); // Initial fetch
+
+    const interval = setInterval(() => {
+      if (!isAlert) { // Only fetch if no alert is showing
+        fetchAllData();
+      }
+    }, 1000); // Poll every second
+
+    return () => clearInterval(interval);
+  }, [isAlert, shouldRefetch]); // Dependencies
 
   useEffect(() => {
     const fetchData = async () => {
@@ -121,11 +180,6 @@ export default function HomeScreen() {
           travel: travelData.cumulative_spending || {},
           entertainment: entertainmentData.cumulative_spending || {}
         });
-
-        // Fetch transactions
-        const transactionsRes = await fetch(`${API_URL}/transactions`);
-        const transactionsData = await transactionsRes.json();
-        setTransactions(transactionsData.transactions || []);
 
         // Call /top_spenders using POST.
         // The backend expects the username as a query parameter,
@@ -187,11 +241,42 @@ export default function HomeScreen() {
       </ScrollView>
       
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        <Text style={styles.totalSpendingTitle}>Total Spending</Text>
+        
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.buttonContainer}
+          contentContainerStyle={styles.buttonContentContainer}
+        >
+          {categories.map((category) => (
+            <Pressable
+              key={category.id}
+              style={[
+                styles.button,
+                selectedCategory === category.id && styles.selectedButton,
+              ]}
+              onPress={() => setSelectedCategory(category.id)}
+            >
+              <Text
+                style={[
+                  styles.buttonText,
+                  selectedCategory === category.id && styles.selectedButtonText,
+                ]}
+              >
+                {category.id.charAt(0).toUpperCase() + category.id.slice(1)}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
         {categories.map((category) => (
           selectedCategory === category.id && (
-            <SpendingChart
+            <SpendingGraph
               key={category.id}
               data={spendingData[category.id as keyof typeof spendingData] ?? {}}
+              predictedValue={predictedValues[category.id as keyof typeof predictedValues] ?? 0}
+              category={category.id as 'all' | 'food' | 'entertainment' | 'travel'}
               title={category.title}
               color={category.color}
             />
@@ -203,6 +288,11 @@ export default function HomeScreen() {
           topSpenderCount={topSpenders.top_spender_count}
           top2SpenderCount={topSpenders.top2_spender_count}
         />
+
+                <SpendingProgress category="food" color="#FF6B6B" />
+        <SpendingProgress category="entertainment" color="#4ECDC4" />
+        <SpendingProgress category="travel" color="#45B7D1" />
+
         <SubscriptionsList />
         <TransactionList transactions={transactions} />
       </ScrollView>
@@ -213,33 +303,48 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000', // Black background for the SafeAreaView
+    backgroundColor: '#000000',
+    paddingTop: 0 ,
   },
   scrollViewContent: {
-    paddingBottom: 20,
-    alignItems: 'center',
-    backgroundColor: '#000', // Black background for the ScrollView
-    flexGrow: 1,
+    padding: 16,
+    paddingTop: 0,
   },
   buttonContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 5,
-    backgroundColor: '#000',
+    marginBottom: 8,
+    marginTop: 0,
+  },
+  buttonContentContainer: {
+    paddingRight: 16, // Add padding for last button
   },
   button: {
-    color: '#fff',
-    padding: 10,
-    marginHorizontal: 5,
-    borderRadius: 20,
-    overflow: 'hidden',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 16,
+    backgroundColor: '#1C1C1E',
+    marginRight: 6,
     borderWidth: 1,
-    borderColor: '#333',
-    minWidth: 80,
-    textAlign: 'center',
+    borderColor: '#007AFF',
   },
   selectedButton: {
-    backgroundColor: '#333',
-    borderColor: '#fff',
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  buttonText: {
+    color: '#007AFF',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  selectedButtonText: {
+    color: '#FFFFFF',
+  },
+  totalSpendingTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 12,
+    marginTop: 8,
   },
   tooltipContainer: {
     position: 'absolute',
