@@ -73,3 +73,5 @@ Thumbs.db
 # ---- Other Ignored Files ----
 # Put additional files you want to ignore below
 .env
+node_modules/
+package-lock.json

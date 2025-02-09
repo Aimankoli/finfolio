@@ -12,13 +12,13 @@ export default function TabLayout() {
   }, []);
 
   useEffect(() => {
-    console.log("isAuthenticated:", isAuthenticated);
+    console.log("isAuthenticated:", isAuthenticated); // Logging from `ml` branch
+    
     if (isMounted && !isAuthenticated) {
-      console.log("Redirecting to /signin...");
+      console.log("Redirecting to /signin..."); // Logging before redirect
       router.replace("/signin");
     }
   }, [isMounted, isAuthenticated]);
-  
 
   if (!isMounted) {
     return null; // Prevent rendering until mounted
@@ -29,6 +29,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="explore" options={{ title: "Explore" }} />
       <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }
