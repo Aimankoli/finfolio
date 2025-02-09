@@ -234,7 +234,10 @@ if transactions_data is None:
     print("Error fetching transactions after multiple retries.")
     exit()
 
-### Step 2: Extract & Store Transactions in SQLite ###
+
+
+## Step 2: Extract & Store Transactions in SQLite ###
+
 for tx in transactions_data:
     new_transaction = Transaction(
         transaction_id=tx["transaction_id"],
