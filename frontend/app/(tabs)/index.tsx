@@ -10,6 +10,7 @@ import TopTwoSpenders from '@/src/components/TopTwoSpenders';
 import SubscriptionsList from '@/src/components/Subscriptions';
 import SpendingGraph from '@/src/components/Graph';
 import SpendingProgress from '@/src/components/SpendingProgress';
+import ToolTip from '@/src/components/ToolTip';
 
 export default function HomeScreen() {
   const [spendingData, setSpendingData] = useState<{
@@ -221,6 +222,24 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.tooltipContainer}>
+        <ToolTip message="Calendar Tip: Set automatic savings reminders!" />
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.buttonContainer}>
+        {categories.map((category) => (
+          <Text
+            key={category.id}
+            style={[
+              styles.button,
+              selectedCategory === category.id && styles.selectedButton
+            ]}
+            onPress={() => setSelectedCategory(category.id)}
+          >
+            {category.id.charAt(0).toUpperCase() + category.id.slice(1)}
+          </Text>
+        ))}
+      </ScrollView>
+      
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <Text style={styles.totalSpendingTitle}>Total Spending</Text>
         
@@ -327,5 +346,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 8,
   },
-  // ... rest of your existing styles ...
+  tooltipContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    zIndex: 1000,
+  },
 });
