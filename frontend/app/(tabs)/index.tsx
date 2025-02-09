@@ -8,6 +8,8 @@ import { API_URL } from '@/src/config';
 import TransactionList from '@/src/components/TransactionList';
 import TopTwoSpenders from '@/src/components/TopTwoSpenders';
 import SubscriptionsList from '@/src/components/Subscriptions';
+import SpendingGraph from '@/src/components/Graph';
+import SpendingProgress from '@/src/components/SpendingProgress';
 
 export default function HomeScreen() {
   const [spendingData, setSpendingData] = useState<{
@@ -33,6 +35,12 @@ export default function HomeScreen() {
 
   const [isAlert, setIsAlert] = useState(false);
   const [shouldRefetch, setShouldRefetch] = useState(false);
+
+  const [predictedValues, setPredictedValues] = useState({
+    food: 0,
+    entertainment: 0,
+    travel: 0
+  });
 
   const fetchAllData = async () => {
     try {
@@ -245,9 +253,11 @@ export default function HomeScreen() {
 
         {categories.map((category) => (
           selectedCategory === category.id && (
-            <SpendingChart
+            <SpendingGraph
               key={category.id}
               data={spendingData[category.id as keyof typeof spendingData] ?? {}}
+              predictedValue={predictedValues[category.id as keyof typeof predictedValues] ?? 0}
+              category={category.id as 'all' | 'food' | 'entertainment' | 'travel'}
               title={category.title}
               color={category.color}
             />
@@ -259,6 +269,11 @@ export default function HomeScreen() {
           topSpenderCount={topSpenders.top_spender_count}
           top2SpenderCount={topSpenders.top2_spender_count}
         />
+
+                <SpendingProgress category="food" color="#FF6B6B" />
+        <SpendingProgress category="entertainment" color="#4ECDC4" />
+        <SpendingProgress category="travel" color="#45B7D1" />
+
         <SubscriptionsList />
         <TransactionList transactions={transactions} />
       </ScrollView>

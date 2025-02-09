@@ -11,6 +11,8 @@ from sqlalchemy import extract
 from dotenv import load_dotenv
 from collections import Counter
 from sqlalchemy import func
+from pydantic import BaseModel
+import traceback
 
 # Import database and models
 from app.database import engine, get_db
@@ -366,37 +368,65 @@ def get_transactions(db: Session = Depends(get_db)):
 
 import uuid
 from app.schemas.transaction import AddTransactionRequest
+
+class PredictionRequest(BaseModel):
+    username: str
+
 @app.post("/add_transaction")
 def add_transaction(data: AddTransactionRequest, db: Session = Depends(get_db)):
-    transaction_id = str(uuid.uuid4())
-    
-    # Convert category list to string if it's a list
-    category = json.dumps(data.category) if isinstance(data.category, list) else data.category
-    
-    new_transaction = Transaction(
-        transaction_id=transaction_id,
-        account_id="9Ba75DR7nRcq4dBxBkdEfx1J1vwmGyi4xbVKr",
-        name=data.name,
-        merchant_name=data.merchant_name,
-        amount=data.amount,
-        date=data.date,
-        category=category,
-        payment_channel=data.payment_channel,
-        currency=data.currency
-    )
-    db.add(new_transaction)
-    db.commit()
-    db.refresh(new_transaction)
+    try:
+        # Add transaction
+        transaction_id = str(uuid.uuid4())
+        category = json.dumps(data.category) if isinstance(data.category, list) else data.category
+        
+        new_transaction = Transaction(
+            transaction_id=transaction_id,
+            account_id="9Ba75DR7nRcq4dBxBkdEfx1J1vwmGyi4xbVKr",
+            name=data.name,
+            merchant_name=data.merchant_name,
+            amount=data.amount or 0,
+            date=data.date,
+            category=category,
+            payment_channel=data.payment_channel,
+            currency=data.currency
+        )
+        db.add(new_transaction)
+        db.commit()
+        db.refresh(new_transaction)
 
-    # Check for high value transaction and set alert
-    if data.amount > 100:
-        user = db.query(User).first()  # Get the first user for now
-        if user:
-            user.is_alert = 1
-            db.commit()
+        username = "user_good"  # Use string directly
+        
+        try:
+            # Call prediction endpoints with proper request body
+            get_food_model(username, db)  # This is your /food_predicted POST handler
+            get_entertainment_model(username, db)  # This is your /entertainment_predicted POST handler
+            get_travel_model(username, db)  # This is your /travel_predicted POST handler
+            
+            # Call actual spending handlers
+            post_actual_food(username, db)
+            post_actual_entertainment(username, db)
+            post_actual_travel(username, db)
+            
+            # Update adaptive spending
+            adaptive_spending(username, db)
+            
+            print("All predictions and actuals updated successfully")
+            
+        except Exception as inner_e:
+            print(f"Error in updates: {str(inner_e)}")
+            traceback.print_exc()  # Print full error trace
 
-    return new_transaction
-    ## use for api - after calling this method call the alert method. then, call get alert to check if there is an existing alert. then call resolve alert to resolve the alert.
+        # Handle alert
+        if data.amount and data.amount > 100:
+            user = db.query(User).first()
+            if user:
+                user.is_alert = 1
+                db.commit()
+
+        return new_transaction
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/delete_transaction")
 def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
@@ -409,30 +439,122 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
 
 @app.get("/graph_data")
 def get_graph_data(db: Session = Depends(get_db)):
-    # Get first day of current month
-    today = datetime.now()
-    first_day = today.replace(day=1)
+    # Calculate date 30 days ago
+    thirty_days_ago = datetime.now() - timedelta(days=10)
     
-    # Get all transactions from current month ordered by date
+    # Query transactions
     transactions = db.query(Transaction).filter(
-        Transaction.date >= first_day
-    ).order_by(Transaction.date.asc()).all()
-
+        Transaction.date >= thirty_days_ago
+    ).order_by(Transaction.date.desc()).all()
+    
     if not transactions:
         return {"message": "No transactions found"}
-
-    # Create cumulative spending dictionary
-    cumulative_spending = {}
-    running_total = 0
     
+    # Format transactions for response
+    transactions_list = []
     for tx in transactions:
-        date_str = tx.date.strftime("%Y-%m-%d")
-        running_total += tx.amount
-        cumulative_spending[date_str] = running_total
-
+        transactions_list.append({
+            "date": tx.date.strftime("%Y-%m-%d"),
+            "amount": tx.amount,
+            "category": tx.category,
+        })
+    
     return {
-        "message": "Graph data retrieved successfully",
-        "cumulative_spending": cumulative_spending
+        "message": "Transactions retrieved successfully",
+        "transactions": transactions_list,
+        "total_count": len(transactions_list)
+    }
+
+
+import uuid
+from app.schemas.transaction import AddTransactionRequest
+@app.post("/add_transaction")
+def add_transaction(data: AddTransactionRequest, db: Session = Depends(get_db)):
+    try:
+        transaction_id = str(uuid.uuid4())
+        
+        # Convert category list to string if it's a list
+        category = json.dumps(data.category) if isinstance(data.category, list) else data.category
+        
+        new_transaction = Transaction(
+            transaction_id=transaction_id,
+            account_id="9Ba75DR7nRcq4dBxBkdEfx1J1vwmGyi4xbVKr",
+            name=data.name,
+            merchant_name=data.merchant_name,
+            amount=data.amount or 0,
+            date=data.date,
+            category=category,
+            payment_channel=data.payment_channel,
+            currency=data.currency
+        )
+        db.add(new_transaction)
+        db.commit()
+        db.refresh(new_transaction)
+
+        username = "user_good"
+        
+        try:
+            # Call the actual POST endpoint handlers
+            get_food_model(username, db)  # This is your /food_predicted POST handler
+            get_entertainment_model(username, db)  # This is your /entertainment_predicted POST handler
+            get_travel_model(username, db)  # This is your /travel_predicted POST handler
+            
+            # Call actual spending handlers
+            post_actual_food(username, db)
+            post_actual_entertainment(username, db)
+            post_actual_travel(username, db)
+            
+            # Update adaptive spending
+            adaptive_spending(username, db)
+        except Exception as inner_e:
+            print(f"Error in updates: {str(inner_e)}")
+
+        if data.amount and data.amount > 100:
+            user = db.query(User).first()
+            if user:
+                user.is_alert = 1
+                db.commit()
+
+        return new_transaction
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete_transaction")
+def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
+    transaction = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not transaction:
+        return {"message": "Transaction not found"}
+    db.delete(transaction)
+    db.commit()
+    return {"message": "Transaction deleted successfully"}
+
+@app.get("/graph_data")
+def get_graph_data(db: Session = Depends(get_db)):
+    # Calculate date 30 days ago
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    
+    # Query transactions
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= thirty_days_ago
+    ).order_by(Transaction.date.desc()).all()
+    
+    if not transactions:
+        return {"message": "No transactions found"}
+    
+    # Format transactions for response
+    transactions_list = []
+    for tx in transactions:
+        transactions_list.append({
+            "date": tx.date.strftime("%Y-%m-%d"),
+            "amount": tx.amount,
+            "category": tx.category,
+        })
+    
+    return {
+        "message": "Transactions retrieved successfully",
+        "transactions": transactions_list,
+        "total_count": len(transactions_list)
     }
 
 @app.get("/graph_data_food")
@@ -667,9 +789,12 @@ def get_food_predicted(username: str, db: Session = Depends(get_db)):
 @app.post("/food_predicted")
 def get_food_model(username: str, db: Session = Depends(get_db)):
     food_predicted = get_food_predicted(username, db)
-    user.food_spending_predicted = food_predicted["predicted_spending"]
-    db.commit()
-    return food_predicted
+    food_ps = food_predicted.get("predicted_spending", 0)
+    user = db.query(User).filter(User.username == username).first()
+    if user:
+        user.food_spending_predicted = food_ps
+        db.commit()
+    return {"predicted_spending": food_ps}
 
 from dateutil.relativedelta import relativedelta
 
@@ -760,9 +885,12 @@ def get_entertainment_predicted(username: str, db: Session = Depends(get_db)):
 @app.post("/entertainment_predicted")
 def get_entertainment_model(username: str, db: Session = Depends(get_db)):
     entertainment_predicted = get_entertainment_predicted(username, db)
-    user.entertainment_spending_predicted = entertainment_predicted["predicted_spending"]
-    db.commit()
-    return entertainment_predicted
+    entertainment_ps = entertainment_predicted.get("predicted_spending", 0)
+    user = db.query(User).filter(User.username == username).first()
+    if user:
+        user.entertainment_spending_predicted = entertainment_ps
+        db.commit()
+    return {"predicted_spending": entertainment_ps}
 
 # ------------------------------------------------------------------
 # Travel Category Endpoints
@@ -851,28 +979,31 @@ def get_travel_predicted(username: str, db: Session = Depends(get_db)):
 @app.post("/travel_predicted")
 def get_travel_model(username: str, db: Session = Depends(get_db)):
     travel_predicted = get_travel_predicted(username, db)
-    user.travel_spending_predicted = travel_predicted["predicted_spending"]
-    db.commit()
-    return travel_predicted
+    travel_ps = travel_predicted.get("predicted_spending", 0)
+    user = db.query(User).filter(User.username == username).first()
+    if user:
+        user.travel_spending_predicted = travel_ps
+        db.commit()
+    return {"predicted_spending": travel_ps}
 
 @app.get("/get_food_predicted")
 def set_food_predicted(username: str, db: Session = Depends(get_db)):
-    user_instance = db.query(User).filter(User.username == username).first()
-    if not user_instance:
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user.food_spending_predicted
 
 @app.get("/get_entertainment_predicted")
 def set_entertainment_predicted(username: str, db: Session = Depends(get_db)):
-    user_instance = db.query(User).filter(User.username == username).first()
-    if not user_instance:
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user.entertainment_spending_predicted
 
 @app.get("/get_travel_predicted")
 def set_travel_predicted(username: str, db: Session = Depends(get_db)):
-    user_instance = db.query(User).filter(User.username == username).first()
-    if not user_instance:
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user.travel_spending_predicted   
 
@@ -921,11 +1052,17 @@ def get_food_spending(username: str, db: Session = Depends(get_db)):
 
 @app.get("/get_entertainment_spending")
 def get_entertainment_spending(username: str, db: Session = Depends(get_db)):
-    return user.entertainment_spending
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    return {"entertainment_spending": user_instance.entertainment_spending}
 
 @app.get("/get_travel_spending")
 def get_travel_spending(username: str, db: Session = Depends(get_db)):
-    return user.travel_spending
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    return {"travel_spending": user_instance.travel_spending}
 
 @app.post("/adaptive_spending")
 def adaptive_spending(username: str, db: Session = Depends(get_db)):
@@ -933,9 +1070,13 @@ def adaptive_spending(username: str, db: Session = Depends(get_db)):
     if not user_instance:
        raise HTTPException(status_code=404, detail="User not found")
     
-    food_predicted = get_food_predicted(username, db)
-    entertainment_predicted = get_entertainment_predicted(username, db)
-    travel_predicted = get_travel_predicted(username, db)
+    # Set default saving_goal to 0 if None
+    saving_goal = user_instance.saving_goal or 0
+    spend_limit = 1000 - saving_goal
+    
+    food_predicted = get_food_model(username, db)
+    entertainment_predicted = get_entertainment_model(username, db)
+    travel_predicted = get_travel_model(username, db)
     
     # Safely extract predicted_spending values using .get (defaulting to 0 if missing)
     food_ps = food_predicted.get("predicted_spending", 0)
@@ -943,7 +1084,6 @@ def adaptive_spending(username: str, db: Session = Depends(get_db)):
     travel_ps = travel_predicted.get("predicted_spending", 0)
     
     predicted_spending = food_ps + entertainment_ps + travel_ps
-    spend_limit = 1000 - user_instance.saving_goal
 
     # Calculate ratio only if predicted_spending is non-zero
     ratio = spend_limit / predicted_spending if predicted_spending else 0
@@ -955,16 +1095,15 @@ def adaptive_spending(username: str, db: Session = Depends(get_db)):
 
     return {"message": "Adaptive spending updated", "predicted_spending": predicted_spending}
     
-
-@app.get("/total_spending_predicted")
+@app.get("/get_all_predicted")
 def total_spending_predicted(username: str, db: Session = Depends(get_db)):
     user_instance = db.query(User).filter(User.username == username).first()
     if not user_instance:
         raise HTTPException(status_code=404, detail="User not found")
         
-    food_predicted = get_food_predicted(username, db)
-    entertainment_predicted = get_entertainment_predicted(username, db)
-    travel_predicted = get_travel_predicted(username, db)
+    food_predicted = get_food_model(username, db)
+    entertainment_predicted = get_entertainment_model(username, db)
+    travel_predicted = get_travel_model(username, db)
 
     # Use .get with default of 0 if key is missing
     food_ps = food_predicted.get("predicted_spending", 0)
@@ -974,8 +1113,28 @@ def total_spending_predicted(username: str, db: Session = Depends(get_db)):
     predicted_spending = food_ps + entertainment_ps + travel_ps
     spend_limit = 1000 - user_instance.saving_goal  # Assuming saving_goal exists
 
-    if predicted_spending > spend_limit:
-        return {"message": 1, "predicted_spending": predicted_spending}
+    return {"message": 0, "predicted_spending": predicted_spending}
+
+
+
+@app.get("/total_spending_predicted")
+def total_spending_predicted(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    food_predicted = get_food_model(username, db)
+    entertainment_predicted = get_entertainment_model(username, db)
+    travel_predicted = get_travel_model(username, db)
+
+    # Use .get with default of 0 if key is missing
+    food_ps = food_predicted.get("predicted_spending", 0)
+    entertainment_ps = entertainment_predicted.get("predicted_spending", 0)
+    travel_ps = travel_predicted.get("predicted_spending", 0)
+
+    predicted_spending = food_ps + entertainment_ps + travel_ps
+    spend_limit = 1000 - user_instance.saving_goal  # Assuming saving_goal exists
+
     return {"message": 0, "predicted_spending": predicted_spending}
 
 
@@ -1044,3 +1203,12 @@ def transfer_to_savings(username: str, transfer_amt: float, db: Session = Depend
         "new_checkings_balance": user_instance.checkings,
         "new_savings_balance": user_instance.savings
     }
+
+
+
+
+
+
+
+
+
