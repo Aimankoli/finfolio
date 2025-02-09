@@ -1,4 +1,3 @@
-// app/(tabs)/_layout.tsx
 import { Tabs, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../src/context/AuthContext";
@@ -13,8 +12,10 @@ export default function TabLayout() {
   }, []);
 
   useEffect(() => {
+    console.log("isAuthenticated:", isAuthenticated); // Logging from `ml` branch
+    
     if (isMounted && !isAuthenticated) {
-      console.log("Redirecting to /signin...");
+      console.log("Redirecting to /signin..."); // Logging before redirect
       router.replace("/signin");
     }
   }, [isMounted, isAuthenticated]);

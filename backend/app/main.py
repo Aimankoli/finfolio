@@ -18,6 +18,7 @@ from app.models.user import User
 from app.models.transaction import Transaction
 from app.schemas.user import LoginRequest, ExchangePublicTokenRequest
 
+
 # Load environment variables
 load_dotenv()
 
@@ -130,6 +131,23 @@ def set_goal(data: SetGoalRequest, db: Session = Depends(get_db)):
 
     return {"message": "Goal set successfully", "saving_goal": user.saving_goal}
 
+@app.get("/get_goal")
+def get_goal(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.saving_goal is None:
+        return {"message": "No goal set"}
+
+    return {
+        "message": "Goal retrieved successfully",
+        "amount": user.amount,
+        "time_months": user.time_months,
+        "saving_goal": user.saving_goal
+    }
+
+
 @app.post("/top_spenders")
 def get_top_spender(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
@@ -216,6 +234,17 @@ def get_day_paid(username: str, db: Session = Depends(get_db)):
 
     return {"message": "Day Paid", "day_paid": user.day_paid}
 
+import pandas as pd
+import numpy as np
+import xgboost as xgb
+import pickle
+from sklearn.preprocessing import LabelEncoder
+
+
+model = xgb.XGBClassifier()
+model.load_model('xgbmodel.json')
+with open("encoder.pkl", "rb") as file:
+    encoder = pickle.load(file)
 @app.post("/alert")
 def get_alert(db: Session = Depends(get_db)):
 
@@ -226,7 +255,45 @@ def get_alert(db: Session = Depends(get_db)):
         return {"message": "No transactions found"}
 
     #replace with ML model
-    if latest_transaction.amount > 100:
+
+    #replace with ML model
+
+    # Get first category
+    if isinstance(latest_transaction.category, str):
+        try:
+            # Parse the string as JSON to get the actual array
+            categories = json.loads(latest_transaction.category)
+            first_category = categories[0] if categories else None
+        except json.JSONDecodeError:
+            # Fallback to the old method if JSON parsing fails
+            categories = latest_transaction.category.strip('[]').replace('"', '').split(',')
+            first_category = categories[0].strip() if categories else None
+    elif isinstance(latest_transaction.category, list):
+        first_category = latest_transaction.category[0] if latest_transaction.category else None
+
+    print(f"First category: {first_category}")
+
+    new_entry = pd.DataFrame({
+        'merchant': [latest_transaction.merchant_name],  # Example merchant
+        'category': [first_category],  # Example category
+        'amt': [latest_transaction.amount],  # Transaction amount
+        'trans_num': ['ce303c21bbecc75334b69a642c9716c3'],  # Example transaction number
+        'hour': [3],  # Transaction hour
+        'day_of_week': [0],  # Wednesday (0 = Monday, 6 = Sunday)
+        'day_of_month': [23],  # 15th day of the month
+        'month': [9],  # June
+    })
+
+    # Encode the new entry
+    for col in ['merchant', 'category', 'trans_num']:
+        new_entry[col] = encoder[col].transform(new_entry[col])  # Encode categorical values
+
+    # Predict using the model
+    prediction = model.predict(new_entry)
+    pred = prediction[0]
+    print(f"Prediction: {pred}")
+
+    if pred==1:
         user.isalert = 1
         db.commit()
         
