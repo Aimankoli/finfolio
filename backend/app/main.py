@@ -357,6 +357,7 @@ def get_transactions(db: Session = Depends(get_db)):
             "date": tx.date.strftime("%Y-%m-%d"),
             "amount": tx.amount,
             "category": tx.category,
+            "merchant_name": tx.merchant_name,
         })
     
     return {
@@ -437,32 +438,31 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Transaction deleted successfully"}
 
+
+
 @app.get("/graph_data")
 def get_graph_data(db: Session = Depends(get_db)):
-    # Calculate date 30 days ago
-    thirty_days_ago = datetime.now() - timedelta(days=10)
+    today = datetime.now()
+    first_day = today.replace(day=1)
     
-    # Query transactions
     transactions = db.query(Transaction).filter(
-        Transaction.date >= thirty_days_ago
-    ).order_by(Transaction.date.desc()).all()
-    
+        Transaction.date >= first_day
+    ).order_by(Transaction.date.asc()).all()
+
     if not transactions:
         return {"message": "No transactions found"}
+
+    cumulative_spending = {}
+    running_total = 0
     
-    # Format transactions for response
-    transactions_list = []
     for tx in transactions:
-        transactions_list.append({
-            "date": tx.date.strftime("%Y-%m-%d"),
-            "amount": tx.amount,
-            "category": tx.category,
-        })
-    
+        date_str = tx.date.strftime("%Y-%m-%d")
+        running_total += tx.amount
+        cumulative_spending[date_str] = running_total
+
     return {
-        "message": "Transactions retrieved successfully",
-        "transactions": transactions_list,
-        "total_count": len(transactions_list)
+        "message": "Total spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
     }
 
 
@@ -531,30 +531,27 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
 
 @app.get("/graph_data")
 def get_graph_data(db: Session = Depends(get_db)):
-    # Calculate date 30 days ago
-    thirty_days_ago = datetime.now() - timedelta(days=30)
+    today = datetime.now()
+    first_day = today.replace(day=1)
     
-    # Query transactions
     transactions = db.query(Transaction).filter(
-        Transaction.date >= thirty_days_ago
-    ).order_by(Transaction.date.desc()).all()
-    
+        Transaction.date >= first_day
+    ).order_by(Transaction.date.asc()).all()
+
     if not transactions:
         return {"message": "No transactions found"}
+
+    cumulative_spending = {}
+    running_total = 0
     
-    # Format transactions for response
-    transactions_list = []
     for tx in transactions:
-        transactions_list.append({
-            "date": tx.date.strftime("%Y-%m-%d"),
-            "amount": tx.amount,
-            "category": tx.category,
-        })
-    
+        date_str = tx.date.strftime("%Y-%m-%d")
+        running_total += tx.amount
+        cumulative_spending[date_str] = running_total
+
     return {
-        "message": "Transactions retrieved successfully",
-        "transactions": transactions_list,
-        "total_count": len(transactions_list)
+        "message": "Total spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
     }
 
 @app.get("/graph_data_food")
@@ -1113,7 +1110,7 @@ def total_spending_predicted(username: str, db: Session = Depends(get_db)):
     predicted_spending = food_ps + entertainment_ps + travel_ps
     spend_limit = 1000 - user_instance.saving_goal  # Assuming saving_goal exists
 
-    return {"message": 0, "predicted_spending": predicted_spending}
+    return predicted_spending
 
 
 
