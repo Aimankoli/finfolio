@@ -241,9 +241,10 @@ import pickle
 from sklearn.preprocessing import LabelEncoder
 
 
-model = pickle.load(open('xgbmodel.pkl', 'rb'))
-encoder = pickle.load(open('encoder.pkl', 'rb'))
-
+model = xgb.XGBClassifier()
+model.load_model('xgbmodel.json')
+with open("encoder.pkl", "rb") as file:
+    encoder = pickle.load(file)
 @app.post("/alert")
 def get_alert(db: Session = Depends(get_db)):
 
