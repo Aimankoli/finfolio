@@ -19,7 +19,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.tooltipContainer}>
-        <ToolTip message="Calendar Tip: Set automatic savings reminders!" />
+        <ToolTip message="Calendar Tip: Use the calendar to see your upcoming payments and set reminders!" />
       </View>
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <CalendarComponent></CalendarComponent>

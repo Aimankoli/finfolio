@@ -23,7 +23,7 @@ const ToolTip = ({ message }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Savings Tip</Text>
+            <Text style={styles.modalTitle}>App Tips</Text>
             <Text style={styles.modalText}>{message}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
               <Text style={styles.closeButtonText}>Close</Text>

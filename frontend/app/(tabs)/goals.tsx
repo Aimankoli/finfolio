@@ -60,7 +60,7 @@ export default function GoalsScreen(): JSX.Element {
   return (
     <View style={styles.container}>
       <View style={styles.tooltipContainer}>
-        <ToolTip message="Calendar Tip: Set automatic savings reminders!" />
+        <ToolTip message="Goals Tip: Set a goal to save for something specific and reach it faster!" />
       </View>
       <Text style={styles.title}>Your Goal</Text>
 

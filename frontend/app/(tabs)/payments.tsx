@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Button, TouchableOpacity } from 'react-native';
 import AccountBalances from '@/src/components/Balances';
 import { useState, useEffect } from 'react';
 import ScheduleSavings from '@/src/components/ScheduleSavings';
+import ToolTip from '@/src/components/ToolTip';
 
 const Payments: React.FC = () => {
   const incomingPayment = 1000;
@@ -69,6 +70,9 @@ const Payments: React.FC = () => {
   
   return (
     <View style={styles.container}>
+        <View style={styles.tooltipContainer}>
+        <ToolTip message="Savings Tip: Use the calendar to see your upcoming payments and set reminders!" />
+      </View>
       <View style={styles.card}>
         <Text style={styles.info}>Incoming Payment</Text>
         <Text style={[styles.amount, styles.incomingAmount]}>${incomingPayment}</Text>
@@ -86,6 +90,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
+    paddingTop: 50,
     backgroundColor: '#333',
     padding: 20,
   },
@@ -131,6 +136,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  tooltipContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    zIndex: 1000,
   },
 });
 
