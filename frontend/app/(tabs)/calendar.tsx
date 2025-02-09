@@ -5,14 +5,15 @@ import { useState } from 'react';
 import CalendarComponent from '@/src/components/Calendar';
 import WarningComponent from '@/src/components/Warning';
 import ToolTip from '@/src/components/ToolTip';
+import RedirectButtonComponent from '@/src/components/RedirectButtonComponent';
 
 export default function HomeScreen() {
   const [tooltipVisible, setTooltipVisible] = useState(false);
   
   const paymentInfo = {
-    paymentName: "Car Loan Payment",
+    paymentName: "Rent",
     dueDate: "2025-02-20",
-    amount: 500,
+    amount: 750,
   };
 
   return (
@@ -26,6 +27,7 @@ export default function HomeScreen() {
           message="Warning: Your balance is too low to meet your upcoming payment!"
           paymentInfo={paymentInfo}
         />
+        <RedirectButtonComponent message="You have a paycheck coming up, manage your savings!" />
       </ScrollView>
     </SafeAreaView>
   );

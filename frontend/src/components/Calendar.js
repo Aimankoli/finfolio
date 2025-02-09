@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, Modal, StyleSheet, Dimensions } from "react-native";
+import { View, Text, Modal, StyleSheet, Dimensions, TouchableOpacity, TextInput, Button } from "react-native";
 import { Calendar } from "react-native-calendars";
 
 // Get screen width
@@ -7,15 +7,17 @@ const screenWidth = Dimensions.get("window").width;
 
 // Sample data for money flow
 const moneyFlowData = {
-  "2025-02-07": { amount: 200, type: "in" },
-  "2025-02-10": { amount: -150, type: "out" },
-  "2025-02-15": { amount: 300, type: "in" },
-  "2025-02-20": { amount: -50, type: "out" },
+  "2025-01-28": { name: "Paycheck", amount: 1000, type: "in" },
+  "2025-02-10": { name: "Car Loan", amount: -650, type: "out" },
+  "2025-02-11": { name: "Paycheck", amount: 1000, type: "in" },
+  "2025-02-20": { name: "Rent", amount: -750, type: "out" },
 };
 
 const CalendarComponent = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [addTransactionModalVisible, setAddTransactionModalVisible] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({ date: "", amount: 0, type: "in", name: "" });
 
   const generateMarkedDates = () => {
     const markedDates = {};
@@ -42,12 +44,38 @@ const CalendarComponent = () => {
 
   const handleDayPress = (day) => {
     const dateInfo = moneyFlowData[day.dateString];
-    setSelectedDate({ date: day.dateString, ...dateInfo });
-    setModalVisible(true);
+    if (dateInfo) {
+      setSelectedDate({ date: day.dateString, ...dateInfo });
+      setModalVisible(true);
+    }
+  };
+
+  const handleAddTransaction = () => {
+    if (newTransaction.date && newTransaction.amount && newTransaction.name) {
+      moneyFlowData[newTransaction.date] = {
+        amount: newTransaction.amount,
+        type: newTransaction.amount > 0 ? "in" : "out",
+        name: newTransaction.name,
+      };
+      setAddTransactionModalVisible(false);
+    }
+  };
+
+  const handleRemoveTransaction = () => {
+    if (selectedDate && selectedDate.date) {
+      delete moneyFlowData[selectedDate.date];
+      setSelectedDate(null);
+      setModalVisible(false);
+    }
   };
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setAddTransactionModalVisible(true)}>
+          <Text style={styles.addButton}>+</Text>
+        </TouchableOpacity>
+      </View>
       <Calendar
         current={new Date().toISOString().split("T")[0]}
         markingType={"custom"}
@@ -88,16 +116,54 @@ const CalendarComponent = () => {
             {selectedDate ? (
               <>
                 <Text style={styles.modalTitle}>Details for {selectedDate.date}</Text>
+                <Text style={styles.modalText}>Name: {selectedDate.name}</Text>
                 <Text style={styles.modalText}>
                   {selectedDate.type === "in"
                     ? `Money In: $${selectedDate.amount}`
                     : `Money Out: $${Math.abs(selectedDate.amount)}`}
                 </Text>
+                <Button title="Remove Transaction" onPress={handleRemoveTransaction} />
               </>
             ) : (
               <Text style={styles.modalText}>No Data</Text>
             )}
             <Text style={styles.closeButton} onPress={() => setModalVisible(false)}>
+              Close
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={addTransactionModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAddTransactionModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add New Transaction</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              placeholderTextColor="#d4d4d4"
+              onChangeText={(text) => setNewTransaction({ ...newTransaction, name: text })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Date (YYYY-MM-DD)"
+              placeholderTextColor="#d4d4d4"
+              onChangeText={(text) => setNewTransaction({ ...newTransaction, date: text })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Amount"
+              placeholderTextColor="#d4d4d4"
+              keyboardType="numeric"
+              onChangeText={(text) => setNewTransaction({ ...newTransaction, amount: parseFloat(text) })}
+            />
+            <Button title="Add Transaction" onPress={handleAddTransaction} />
+            <Text style={styles.closeButton} onPress={() => setAddTransactionModalVisible(false)}>
               Close
             </Text>
           </View>
@@ -140,6 +206,24 @@ const styles = StyleSheet.create({
     color: "#00adf5",
     fontWeight: "bold",
     textAlign: "center",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    padding: 10,
+  },
+  addButton: {
+    fontSize: 24,
+    color: "#00adf5",
+    fontWeight: "bold",
+  },
+  input: {
+    width: "100%",
+    padding: 10,
+    marginVertical: 10,
+    backgroundColor: "#444",
+    color: "#ffffff",
+    borderRadius: 5,
   },
 });
 
