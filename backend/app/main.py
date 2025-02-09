@@ -546,3 +546,501 @@ def get_graph_data_entertainment(db: Session = Depends(get_db)):
         "cumulative_spending": cumulative_spending
     }
 
+@app.get("/bank_balance")
+def get_bank_balance(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"bank_balance": user.checkings}
+
+@app.post("/set_bank_balance")
+def set_bank_balance(username: str, balance: float, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.checkings = balance
+    db.commit()
+    return {"message": "Bank balance updated", "bank_balance": user.checkings}
+
+@app.get("/savings_balance")
+def get_savings_balance(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"savings_balance": user.savings}
+
+@app.post("/set_savings_balance")
+def set_savings_balance(username: str, balance: float, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.savings = balance
+    db.commit()
+    return {"message": "Savings balance updated", "savings_balance": user.savings}
+
+
+
+def get_food_data(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Calculate the current month range
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    next_month = first_day + relativedelta(months=1)
+
+    # Filter transactions only in the current month
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day,
+        Transaction.date < next_month
+    ).all()
+
+    cumulative_spending = {}
+    running_total = 0
+
+    for tx in transactions:
+        # Ensure we have a valid list of categories
+        if tx.category is None:
+            categories = []
+        elif isinstance(tx.category, str):
+            try:
+                # Attempt to parse the string as JSON.
+                categories = json.loads(tx.category)
+            except json.JSONDecodeError:
+                # Fallback: remove brackets and quotes, then split by comma
+                categories = tx.category.strip('[]').replace('"', '').split(',')
+                categories = [cat.strip() for cat in categories if cat.strip()]
+        elif isinstance(tx.category, list):
+            categories = tx.category
+        else:
+            categories = []
+        
+        # Now safely check if "Food and Drink" is in the category list
+        if any(isinstance(cat, str) and cat.strip() == "Food and Drink" for cat in categories):
+            date_str = tx.date.strftime("%Y-%m-%d")
+            running_total += tx.amount
+            cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Food spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
+
+@app.get("/food_graph")
+def get_food_graph(username: str, db: Session = Depends(get_db)):
+    food_data = get_food_data(username, db)
+    return food_data
+
+
+def get_food_predicted(username: str, db: Session = Depends(get_db)):
+    # Get the food spending data
+    food_data = get_food_data(username, db)
+    cumulative_spending = food_data["cumulative_spending"]
+    
+    if not cumulative_spending:
+        return {"message": "No food spending data found"}
+
+    # Convert data to arrays for regression
+    dates = [datetime.strptime(date, "%Y-%m-%d").day for date in cumulative_spending.keys()]
+    amounts = list(cumulative_spending.values())
+    
+    # Perform linear regression
+    x = np.array(dates).reshape(-1, 1)
+    y = np.array(amounts)
+    
+    if len(x) < 2:
+        return {"message": "Not enough data points for prediction"}
+        
+    coefficients = np.polyfit(x.flatten(), y, 1)
+    slope = coefficients[0]
+    intercept = coefficients[1]
+    
+    # Predict spending for day 28
+    predicted_spending = slope * 28 + intercept
+    
+    return {
+        "message": "Food spending prediction calculated",
+        "predicted_spending": predicted_spending
+    }
+
+@app.post("/food_predicted")
+def get_food_model(username: str, db: Session = Depends(get_db)):
+    food_predicted = get_food_predicted(username, db)
+    user.food_spending_predicted = food_predicted["predicted_spending"]
+    db.commit()
+    return food_predicted
+
+from dateutil.relativedelta import relativedelta
+
+# ------------------------------------------------------------------
+# Entertainment Category Endpoints
+# ------------------------------------------------------------------
+def get_entertainment_data(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Calculate the current month range
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    next_month = first_day + relativedelta(months=1)
+
+    # Filter transactions only in the current month
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day,
+        Transaction.date < next_month
+    ).all()
+
+    cumulative_spending = {}
+    running_total = 0
+
+    for tx in transactions:
+        # Ensure we have a valid list of categories
+        if tx.category is None:
+            categories = []
+        elif isinstance(tx.category, str):
+            try:
+                categories = json.loads(tx.category)
+            except json.JSONDecodeError:
+                categories = tx.category.strip('[]').replace('"', '').split(',')
+                categories = [cat.strip() for cat in categories if cat.strip()]
+        elif isinstance(tx.category, list):
+            categories = tx.category
+        else:
+            categories = []
+        
+        # Check if "Entertainment" is in the category list
+        if any(isinstance(cat, str) and cat.strip() == "Entertainment" for cat in categories):
+            date_str = tx.date.strftime("%Y-%m-%d")
+            running_total += tx.amount
+            cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Entertainment spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
+
+@app.get("/entertainment_graph")
+def get_entertainment_graph(username: str, db: Session = Depends(get_db)):
+    entertainment_data = get_entertainment_data(username, db)
+    return entertainment_data
+
+def get_entertainment_predicted(username: str, db: Session = Depends(get_db)):
+    # Get the entertainment spending data
+    entertainment_data = get_entertainment_data(username, db)
+    cumulative_spending = entertainment_data["cumulative_spending"]
+    
+    if not cumulative_spending:
+        return {"message": "No entertainment spending data found"}
+    
+    # Convert data to arrays for regression
+    dates = [datetime.strptime(date, "%Y-%m-%d").day for date in cumulative_spending.keys()]
+    amounts = list(cumulative_spending.values())
+    
+    # Perform linear regression
+    x = np.array(dates).reshape(-1, 1)
+    y = np.array(amounts)
+    
+    if len(x) < 2:
+        return {"message": "Not enough data points for prediction"}
+        
+    coefficients = np.polyfit(x.flatten(), y, 1)
+    slope = coefficients[0]
+    intercept = coefficients[1]
+    
+    # Predict spending for day 28
+    predicted_spending = slope * 28 + intercept
+    
+    return {
+        "message": "Entertainment spending prediction calculated",
+        "predicted_spending": predicted_spending
+    }
+
+@app.post("/entertainment_predicted")
+def get_entertainment_model(username: str, db: Session = Depends(get_db)):
+    entertainment_predicted = get_entertainment_predicted(username, db)
+    user.entertainment_spending_predicted = entertainment_predicted["predicted_spending"]
+    db.commit()
+    return entertainment_predicted
+
+# ------------------------------------------------------------------
+# Travel Category Endpoints
+# ------------------------------------------------------------------
+def get_travel_data(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Calculate the current month range
+    today = datetime.now()
+    first_day = today.replace(day=1)
+    next_month = first_day + relativedelta(months=1)
+
+    # Filter transactions only in the current month
+    transactions = db.query(Transaction).filter(
+        Transaction.date >= first_day,
+        Transaction.date < next_month
+    ).all()
+
+    cumulative_spending = {}
+    running_total = 0
+
+    for tx in transactions:
+        # Ensure we have a valid list of categories
+        if tx.category is None:
+            categories = []
+        elif isinstance(tx.category, str):
+            try:
+                categories = json.loads(tx.category)
+            except json.JSONDecodeError:
+                categories = tx.category.strip('[]').replace('"', '').split(',')
+                categories = [cat.strip() for cat in categories if cat.strip()]
+        elif isinstance(tx.category, list):
+            categories = tx.category
+        else:
+            categories = []
+        
+        # Check if "Travel" is in the category list
+        if any(isinstance(cat, str) and cat.strip() == "Travel" for cat in categories):
+            date_str = tx.date.strftime("%Y-%m-%d")
+            running_total += tx.amount
+            cumulative_spending[date_str] = running_total
+
+    return {
+        "message": "Travel spending data retrieved successfully",
+        "cumulative_spending": cumulative_spending
+    }
+
+@app.get("/travel_graph")
+def get_travel_graph(username: str, db: Session = Depends(get_db)):
+    travel_data = get_travel_data(username, db)
+    return travel_data
+
+def get_travel_predicted(username: str, db: Session = Depends(get_db)):
+    # Get the travel spending data
+    travel_data = get_travel_data(username, db)
+    cumulative_spending = travel_data["cumulative_spending"]
+    
+    if not cumulative_spending:
+        return {"message": "No travel spending data found"}
+    
+    # Convert data to arrays for regression
+    dates = [datetime.strptime(date, "%Y-%m-%d").day for date in cumulative_spending.keys()]
+    amounts = list(cumulative_spending.values())
+    
+    # Perform linear regression
+    x = np.array(dates).reshape(-1, 1)
+    y = np.array(amounts)
+    
+    if len(x) < 2:
+        return {"message": "Not enough data points for prediction"}
+        
+    coefficients = np.polyfit(x.flatten(), y, 1)
+    slope = coefficients[0]
+    intercept = coefficients[1]
+    
+    # Predict spending for day 28
+    predicted_spending = slope * 28 + intercept
+    
+    return {
+        "message": "Travel spending prediction calculated",
+        "predicted_spending": predicted_spending
+    }
+
+@app.post("/travel_predicted")
+def get_travel_model(username: str, db: Session = Depends(get_db)):
+    travel_predicted = get_travel_predicted(username, db)
+    user.travel_spending_predicted = travel_predicted["predicted_spending"]
+    db.commit()
+    return travel_predicted
+
+@app.get("/get_food_predicted")
+def set_food_predicted(username: str, db: Session = Depends(get_db)):
+    return user.food_spending_predicted
+
+@app.get("/get_entertainment_predicted")
+def set_entertainment_predicted(username: str, db: Session = Depends(get_db)):
+    return user.entertainment_spending_predicted
+
+@app.get("/get_travel_predicted")
+def set_travel_predicted(username: str, db: Session = Depends(get_db)):
+    return user.travel_spending_predicted   
+
+@app.post("/post_actual_food")
+def post_actual_food(username: str, db: Session = Depends(get_db)):
+    food_data = get_food_data(username, db)
+    cumulative_spending = food_data["cumulative_spending"]
+    if cumulative_spending:
+        last_value = list(cumulative_spending.values())[-1]
+        user = db.query(User).filter(User.username == username).first()
+        user.food_spending = last_value
+        db.commit()
+        return {"message": "Food spending updated", "food_spending": last_value}
+    return {"message": "No food spending data found"}
+
+@app.post("/post_actual_entertainment")
+def post_actual_entertainment(username: str, db: Session = Depends(get_db)):
+    entertainment_data = get_entertainment_data(username, db)
+    cumulative_spending = entertainment_data["cumulative_spending"]
+    if cumulative_spending:
+        last_value = list(cumulative_spending.values())[-1]
+        user = db.query(User).filter(User.username == username).first()
+        user.entertainment_spending = last_value
+        db.commit()
+        return {"message": "Entertainment spending updated", "entertainment_spending": last_value}
+    return {"message": "No entertainment spending data found"}
+
+@app.post("/post_actual_travel")
+def post_actual_travel(username: str, db: Session = Depends(get_db)):
+    travel_data = get_travel_data(username, db)
+    cumulative_spending = travel_data["cumulative_spending"]
+    if cumulative_spending:
+        last_value = list(cumulative_spending.values())[-1]
+        user = db.query(User).filter(User.username == username).first()
+        user.travel_spending = last_value
+        db.commit()
+        return {"message": "Travel spending updated", "travel_spending": last_value}
+    return {"message": "No travel spending data found"}
+
+@app.get("/get_food_spending")
+def get_food_spending(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    return {"food_spending": user_instance.food_spending}
+
+@app.get("/get_entertainment_spending")
+def get_entertainment_spending(username: str, db: Session = Depends(get_db)):
+    return user.entertainment_spending
+
+@app.get("/get_travel_spending")
+def get_travel_spending(username: str, db: Session = Depends(get_db)):
+    return user.travel_spending
+
+@app.post("/adaptive_spending")
+def adaptive_spending(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    
+    food_predicted = get_food_predicted(username, db)
+    entertainment_predicted = get_entertainment_predicted(username, db)
+    travel_predicted = get_travel_predicted(username, db)
+    
+    # Safely extract predicted_spending values using .get (defaulting to 0 if missing)
+    food_ps = food_predicted.get("predicted_spending", 0)
+    entertainment_ps = entertainment_predicted.get("predicted_spending", 0)
+    travel_ps = travel_predicted.get("predicted_spending", 0)
+    
+    predicted_spending = food_ps + entertainment_ps + travel_ps
+    spend_limit = 1000 - user_instance.saving_goal
+
+    # Calculate ratio only if predicted_spending is non-zero
+    ratio = spend_limit / predicted_spending if predicted_spending else 0
+
+    user_instance.food_spending_goal = food_ps * ratio
+    user_instance.entertainment_spending_goal = entertainment_ps * ratio
+    user_instance.travel_spending_goal = travel_ps * ratio
+    db.commit()
+
+    return {"message": "Adaptive spending updated", "predicted_spending": predicted_spending}
+    
+
+@app.get("/total_spending_predicted")
+def total_spending_predicted(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    food_predicted = get_food_predicted(username, db)
+    entertainment_predicted = get_entertainment_predicted(username, db)
+    travel_predicted = get_travel_predicted(username, db)
+
+    # Use .get with default of 0 if key is missing
+    food_ps = food_predicted.get("predicted_spending", 0)
+    entertainment_ps = entertainment_predicted.get("predicted_spending", 0)
+    travel_ps = travel_predicted.get("predicted_spending", 0)
+
+    predicted_spending = food_ps + entertainment_ps + travel_ps
+    spend_limit = 1000 - user_instance.saving_goal  # Assuming saving_goal exists
+
+    if predicted_spending > spend_limit:
+        return {"message": 1, "predicted_spending": predicted_spending}
+    return {"message": 0, "predicted_spending": predicted_spending}
+
+
+@app.get("/get_food_spending_goal")
+def get_food_spending_goal(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    return {"food_spending_goal": user_instance.food_spending_goal}
+
+@app.get("/get_entertainment_spending_goal")
+def get_entertainment_spending_goal(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    return {"entertainment_spending_goal": user_instance.entertainment_spending_goal}
+
+@app.get("/get_travel_spending_goal")
+def get_travel_spending_goal(username: str, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+       raise HTTPException(status_code=404, detail="User not found")
+    return {"travel_spending_goal": user_instance.travel_spending_goal}
+
+@app.post("/simulate_income")
+def simulate_income(username: str, amt: float, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if amt < 0:
+        raise HTTPException(status_code=400, detail="Amount cannot be negative")
+        
+    # Add income to checkings
+    if user_instance.checkings is None:
+        user_instance.checkings = amt
+    else:
+        user_instance.checkings += amt
+    
+    db.commit()
+    return {"message": "Income added to checkings", "amount": amt}
+
+@app.post("/transfer_to_savings") 
+def transfer_to_savings(username: str, transfer_amt: float, db: Session = Depends(get_db)):
+    user_instance = db.query(User).filter(User.username == username).first()
+    if not user_instance:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if transfer_amt < 0:
+        raise HTTPException(status_code=400, detail="Transfer amount cannot be negative")
+        
+    if user_instance.checkings < transfer_amt:
+        raise HTTPException(status_code=400, detail="Insufficient funds in checkings")
+        
+    # Transfer money from checkings to savings
+    user_instance.checkings -= transfer_amt
+    if user_instance.savings is None:
+        user_instance.savings = transfer_amt
+    else:
+        user_instance.savings += transfer_amt
+        
+    db.commit()
+    return {
+        "message": "Transfer successful",
+        "amount": transfer_amt,
+        "new_checkings_balance": user_instance.checkings,
+        "new_savings_balance": user_instance.savings
+    }
+
+
+
+
+
+
+
+
+
